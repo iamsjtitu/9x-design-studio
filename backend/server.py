@@ -1,4 +1,6 @@
 from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 import os
@@ -21,6 +23,13 @@ load_dotenv(ROOT_DIR / '.env')
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
 SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
 RECEIVER_EMAIL = os.environ.get('RECEIVER_EMAIL', 'sales@9x.design')
+
+# Static files config (for production — serve Vite build output)
+FRONTEND_DIST_DIR = os.environ.get(
+    'FRONTEND_DIST_DIR',
+    str((ROOT_DIR / '..' / 'frontend' / 'dist').resolve()),
+)
+SERVE_STATIC = os.environ.get('SERVE_STATIC', 'false').lower() in ('1', 'true', 'yes')
 
 if RESEND_API_KEY:
     resend.api_key = RESEND_API_KEY
@@ -217,3 +226,34 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ── Static file serving (production only) ───────────────────────────────────
+# When SERVE_STATIC=true, FastAPI also serves the Vite build as the frontend
+# so you can run a single process on the VPS: uvicorn server:app. Cloudflare
+# Tunnel → localhost:8001 and you're done — no nginx needed.
+if SERVE_STATIC and Path(FRONTEND_DIST_DIR).is_dir():
+    assets_dir = Path(FRONTEND_DIST_DIR) / 'assets'
+    if assets_dir.is_dir():
+        app.mount('/assets', StaticFiles(directory=str(assets_dir)), name='assets')
+
+    @app.get('/{full_path:path}', include_in_schema=False)
+    async def serve_spa(full_path: str):
+        # API routes are already handled by the router above
+        if full_path.startswith('api/'):
+            raise HTTPException(status_code=404)
+
+        # Try the requested file first (favicon.svg, vite.svg, _redirects, etc.)
+        candidate = Path(FRONTEND_DIST_DIR) / full_path
+        if full_path and candidate.is_file():
+            return FileResponse(str(candidate))
+
+        # Fallback to index.html (SPA routing)
+        index = Path(FRONTEND_DIST_DIR) / 'index.html'
+        if index.is_file():
+            return FileResponse(str(index))
+        raise HTTPException(status_code=404)
+
+    logger.info(f"Serving frontend from: {FRONTEND_DIST_DIR}")
+else:
+    logger.info("Static file serving disabled (dev mode — Vite handles frontend on :3000)")
