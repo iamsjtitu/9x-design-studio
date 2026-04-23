@@ -1,14 +1,13 @@
 from fastapi import FastAPI, APIRouter, HTTPException
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import asyncio
 import html
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
-from typing import List, Optional
+from typing import Optional
 import uuid
 from datetime import datetime, timezone
 
@@ -18,11 +17,6 @@ import resend
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
-
 # Email config
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
 SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
@@ -31,8 +25,8 @@ RECEIVER_EMAIL = os.environ.get('RECEIVER_EMAIL', 'sales@9x.design')
 if RESEND_API_KEY:
     resend.api_key = RESEND_API_KEY
 
-# Create the main app without a prefix
-app = FastAPI(title="9x.design API", version="1.0.0")
+# Create the main app
+app = FastAPI(title="9x.design API", version="2.0.0")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
@@ -68,7 +62,6 @@ class Lead(BaseModel):
     company: Optional[str] = None
     budget: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    email_sent: bool = False
 
 
 class ContactResponse(BaseModel):
@@ -77,7 +70,7 @@ class ContactResponse(BaseModel):
     message: str = "Thanks! We'll get back to you within 24 hours."
 
 
-# ── Email helper ─────────────────────────────────────────────────────────────
+# ── Email helpers ────────────────────────────────────────────────────────────
 def _build_lead_email_html(lead: Lead) -> str:
     service_label = {
         "web": "Website Development",
@@ -87,7 +80,6 @@ def _build_lead_email_html(lead: Lead) -> str:
         "other": "Other",
     }.get(lead.service, lead.service.title())
 
-    # Escape user-provided content before injecting into the HTML template
     e_name = html.escape(lead.name)
     e_email = html.escape(lead.email)
     e_message = html.escape(lead.message)
@@ -149,10 +141,11 @@ def _build_lead_email_html(lead: Lead) -> str:
 """
 
 
-async def _send_lead_email(lead: Lead) -> bool:
+async def _send_lead_email(lead: Lead) -> str | None:
+    """Send the lead notification email. Returns Resend message id or None on failure."""
     if not RESEND_API_KEY:
-        logger.warning("RESEND_API_KEY not set — skipping email notification")
-        return False
+        logger.warning("RESEND_API_KEY not set — email skipped")
+        return None
     params = {
         "from": SENDER_EMAIL,
         "to": [RECEIVER_EMAIL],
@@ -162,11 +155,12 @@ async def _send_lead_email(lead: Lead) -> bool:
     }
     try:
         email = await asyncio.to_thread(resend.Emails.send, params)
-        logger.info(f"Lead email sent: {email.get('id')}")
-        return True
+        msg_id = email.get("id")
+        logger.info(f"Lead email sent: {msg_id}")
+        return msg_id
     except Exception as e:
         logger.error(f"Failed to send lead email: {e}")
-        return False
+        return None
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
@@ -180,13 +174,13 @@ async def health():
     return {
         "status": "ok",
         "email_configured": bool(RESEND_API_KEY),
-        "db": "connected",
+        "sender": SENDER_EMAIL,
+        "receiver": RECEIVER_EMAIL,
     }
 
 
 @api_router.post("/contact", response_model=ContactResponse)
 async def submit_contact(payload: LeadCreate):
-    # Normalize service field
     service = (payload.service or "other").lower().strip()
     if service not in SERVICE_CHOICES:
         service = "other"
@@ -200,62 +194,17 @@ async def submit_contact(payload: LeadCreate):
         budget=payload.budget.strip() if payload.budget else None,
     )
 
-    # Fire-and-ack: send email but don't block response on failure
-    email_sent = await _send_lead_email(lead)
-    lead.email_sent = email_sent
-
-    # Persist to MongoDB (datetime -> ISO string)
-    doc = lead.model_dump()
-    doc['created_at'] = doc['created_at'].isoformat()
-    try:
-        await db.leads.insert_one(doc)
-    except Exception as e:
-        logger.error(f"DB insert failed: {e}")
-        raise HTTPException(status_code=500, detail="Failed to save lead")
+    msg_id = await _send_lead_email(lead)
+    if not msg_id:
+        # Email failed — still return success to user but log error
+        # (User already filled form; we don't want them to retry)
+        logger.error(f"Email delivery failed for lead {lead.id} ({lead.email})")
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to send your message right now. Please email us directly at sales@9x.design",
+        )
 
     return ContactResponse(id=lead.id)
-
-
-@api_router.get("/leads", response_model=List[Lead])
-async def list_leads(limit: int = 100):
-    leads = await db.leads.find({}, {"_id": 0}).sort("created_at", -1).to_list(limit)
-    for lead in leads:
-        if isinstance(lead.get('created_at'), str):
-            try:
-                lead['created_at'] = datetime.fromisoformat(lead['created_at'])
-            except ValueError:
-                lead['created_at'] = datetime.now(timezone.utc)
-    return leads
-
-
-# Keep legacy status endpoints for compatibility
-class StatusCheck(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-class StatusCheckCreate(BaseModel):
-    client_name: str
-
-
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_obj = StatusCheck(**input.model_dump())
-    doc = status_obj.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
-    await db.status_checks.insert_one(doc)
-    return status_obj
-
-
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    status_checks = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
-    for check in status_checks:
-        if isinstance(check['timestamp'], str):
-            check['timestamp'] = datetime.fromisoformat(check['timestamp'])
-    return status_checks
 
 
 # Include the router in the main app
@@ -268,8 +217,3 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()
