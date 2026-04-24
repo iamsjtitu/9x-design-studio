@@ -5,7 +5,7 @@ import { submitContact } from '../lib/api'
 
 const contactInfo = [
   { icon: Mail, label: 'Email', value: 'sales@9x.design', href: 'mailto:sales@9x.design' },
-  { icon: Phone, label: 'Phone', value: '+91 98765 43210', href: 'tel:+919876543210' },
+  { icon: Phone, label: 'Phone', value: '+91 72059 30002', href: 'tel:+917205930002' },
   { icon: MapPin, label: 'Location', value: 'India (Serving Worldwide)', href: null },
 ]
 

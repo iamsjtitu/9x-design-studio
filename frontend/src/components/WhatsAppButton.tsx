@@ -5,7 +5,7 @@ export default function WhatsAppButton() {
   const [show, setShow] = useState(false)
   const [tooltip, setTooltip] = useState(true)
 
-  const phone = '919876543210' // +91 98765 43210
+  const phone = '917205930002' // +91 72059 30002
   const message = encodeURIComponent(
     "Hi 9x.design team! I'd like to discuss a project with you."
   )

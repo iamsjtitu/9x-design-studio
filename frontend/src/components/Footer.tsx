@@ -23,8 +23,8 @@ const companyLinks: { label: string; href: string }[] = [
 
 const connectLinks: { label: string; href: string; external?: boolean }[] = [
   { label: 'sales@9x.design', href: 'mailto:sales@9x.design' },
-  { label: '+91 98765 43210', href: 'tel:+919876543210' },
-  { label: 'WhatsApp', href: 'https://wa.me/919876543210', external: true },
+  { label: '+91 72059 30002', href: 'tel:+917205930002' },
+  { label: 'WhatsApp', href: 'https://wa.me/917205930002', external: true },
   { label: 'Book a Call', href: '#contact' },
 ]
 
