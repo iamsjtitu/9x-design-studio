@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowUpRight, X, TrendingUp, Users, Clock } from 'lucide-react'
+import { ArrowUpRight, X, TrendingUp, Users, Clock, ChevronLeft, ChevronRight } from 'lucide-react'
 
 const projects = [
   {
@@ -8,6 +8,11 @@ const projects = [
     description:
       'End-to-end Rice Mill management platform for 100+ rice mills across India — real-time heartbeats, WhatsApp alerts, online access, live weighbridge integration & many more.',
     image: '/projects/mill-main.jpg',
+    gallery: [
+      { src: '/projects/mill-main.jpg', caption: 'Mill entries · daily operations dashboard' },
+      { src: '/projects/mill-weighbridge.jpg', caption: 'Live weighbridge + camera feeds — zero manual entry' },
+      { src: '/projects/mill-license.jpg', caption: 'Cloud-issued license with remote access credentials' },
+    ],
     tags: ['Node.js', 'Cloudflare Tunnels', 'WhatsApp API'],
     color: 'hsl(16 100% 50%)',
     client: 'MillEntry · Internal Product',
@@ -153,18 +158,37 @@ const projects = [
 
 type Project = (typeof projects)[number]
 
+type GalleryItem = { src: string; caption?: string }
+
 export default function Portfolio() {
   const [active, setActive] = useState<Project | null>(null)
+  const [slide, setSlide] = useState(0)
+
+  // Normalize gallery: use project.gallery if present, else fall back to single image
+  const gallery: GalleryItem[] = active
+    ? 'gallery' in active && Array.isArray((active as any).gallery)
+      ? (active as any).gallery
+      : [{ src: active.image }]
+    : []
+
+  const next = () => setSlide((s) => (s + 1) % gallery.length)
+  const prev = () => setSlide((s) => (s - 1 + gallery.length) % gallery.length)
 
   useEffect(() => {
     if (!active) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setActive(null)
+    setSlide(0)
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setActive(null)
+      if (e.key === 'ArrowRight') next()
+      if (e.key === 'ArrowLeft') prev()
+    }
     document.body.style.overflow = 'hidden'
     window.addEventListener('keydown', onKey)
     return () => {
       document.body.style.overflow = ''
       window.removeEventListener('keydown', onKey)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active])
 
   return (
@@ -300,14 +324,49 @@ export default function Portfolio() {
               <X size={18} />
             </button>
 
-            {/* Hero image */}
-            <div className="relative h-56 sm:h-72 overflow-hidden">
-              <img
-                src={active.image}
-                alt={active.title}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-card via-card/50 to-transparent" />
+            {/* Hero gallery */}
+            <div className="relative h-56 sm:h-80 overflow-hidden bg-black/40 group/hero">
+              {gallery.map((g, i) => (
+                <img
+                  key={i}
+                  src={g.src}
+                  alt={`${active.title} — screen ${i + 1}`}
+                  className="absolute inset-0 w-full h-full object-cover transition-opacity duration-500"
+                  style={{ opacity: i === slide ? 1 : 0 }}
+                  data-testid={`portfolio-gallery-slide-${i}`}
+                />
+              ))}
+              <div className="absolute inset-0 bg-gradient-to-t from-card via-card/40 to-transparent pointer-events-none" />
+
+              {/* Arrows (only if more than 1 image) */}
+              {gallery.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={prev}
+                    aria-label="Previous image"
+                    data-testid="portfolio-gallery-prev"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-background/80 backdrop-blur border border-border/60 flex items-center justify-center opacity-0 group-hover/hero:opacity-100 transition-opacity hover:bg-background"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={next}
+                    aria-label="Next image"
+                    data-testid="portfolio-gallery-next"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-background/80 backdrop-blur border border-border/60 flex items-center justify-center opacity-0 group-hover/hero:opacity-100 transition-opacity hover:bg-background"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+
+                  {/* Slide indicator */}
+                  <div className="absolute top-4 left-4 text-[11px] font-mono font-semibold px-2 py-1 rounded-md bg-background/80 backdrop-blur border border-border/60">
+                    {slide + 1} / {gallery.length}
+                  </div>
+                </>
+              )}
+
               <div className="absolute bottom-4 left-6 right-6">
                 <div
                   className="inline-block text-xs font-semibold px-2.5 py-1 rounded-full mb-3"
@@ -330,6 +389,40 @@ export default function Portfolio() {
                 </h3>
               </div>
             </div>
+
+            {/* Thumbnail strip + caption */}
+            {gallery.length > 1 && (
+              <div className="px-6 sm:px-8 pt-5 pb-1">
+                {gallery[slide]?.caption && (
+                  <p className="text-xs text-muted-foreground mb-3 text-center italic">
+                    {gallery[slide].caption}
+                  </p>
+                )}
+                <div className="flex gap-2 justify-center flex-wrap">
+                  {gallery.map((g, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setSlide(i)}
+                      data-testid={`portfolio-gallery-thumb-${i}`}
+                      aria-label={`Go to image ${i + 1}`}
+                      className={`relative w-20 h-14 rounded-lg overflow-hidden border-2 transition-all ${
+                        i === slide
+                          ? 'border-primary opacity-100 scale-105'
+                          : 'border-border/60 opacity-60 hover:opacity-90'
+                      }`}
+                    >
+                      <img
+                        src={g.src}
+                        alt=""
+                        loading="lazy"
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="p-6 sm:p-8">
               {/* Meta row */}
