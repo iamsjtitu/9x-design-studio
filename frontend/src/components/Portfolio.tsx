@@ -3,6 +3,28 @@ import { ArrowUpRight, X, TrendingUp, Users, Clock } from 'lucide-react'
 
 const projects = [
   {
+    title: 'Rice Mill Management Software',
+    category: 'SaaS Platform',
+    description:
+      'End-to-end Rice Mill management platform for 100+ rice mills across India — real-time heartbeats, WhatsApp alerts, online access, live weighbridge integration & many more.',
+    image:
+      'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&auto=format&fit=crop&q=80',
+    tags: ['Node.js', 'Cloudflare Tunnels', 'WhatsApp API'],
+    color: 'hsl(16 100% 50%)',
+    client: 'MillEntry · Internal Product',
+    duration: 'Ongoing · 8+ months',
+    challenge:
+      'Rice mill owners across India needed a unified system to replace scattered spreadsheets, manual billing, and disconnected weighbridge readings — plus a way for the owner to access their plant from anywhere without exposing the mill PC to the internet.',
+    solution:
+      'Built a full-stack platform: a Windows desktop app for on-site staff, a cloud command center for head office, live heartbeat monitoring, auto-provisioned per-customer Cloudflare Tunnels for secure remote access, weighbridge serial integration, and 360Messenger-powered WhatsApp alerts for licenses, renewals, and suspensions.',
+    results: [
+      { label: 'Active mills', value: '100+', sub: 'live across India' },
+      { label: 'Heartbeat uptime', value: '99.9%', sub: 'observed SLA' },
+      { label: 'Manual work cut', value: '~12hr', sub: 'per mill / week' },
+    ],
+    link: 'https://mill.9x.design',
+  },
+  {
     title: 'E-Commerce Platform',
     category: 'Web Development',
     description:
@@ -401,15 +423,29 @@ export default function Portfolio() {
                 </div>
               </div>
 
-              <a
-                href="#contact"
-                onClick={() => setActive(null)}
-                className="btn-primary w-full py-3.5 rounded-xl text-sm font-semibold inline-flex items-center justify-center gap-2"
-                data-testid="portfolio-modal-cta"
-              >
-                Start a similar project
-                <ArrowUpRight size={16} />
-              </a>
+              <div className="flex flex-col sm:flex-row gap-3">
+                {active.link && (
+                  <a
+                    href={active.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-outline flex-1 py-3.5 rounded-xl text-sm font-semibold inline-flex items-center justify-center gap-2"
+                    data-testid="portfolio-modal-visit"
+                  >
+                    Visit Live Site
+                    <ArrowUpRight size={16} />
+                  </a>
+                )}
+                <a
+                  href="#contact"
+                  onClick={() => setActive(null)}
+                  className="btn-primary flex-1 py-3.5 rounded-xl text-sm font-semibold inline-flex items-center justify-center gap-2"
+                  data-testid="portfolio-modal-cta"
+                >
+                  Start a similar project
+                  <ArrowUpRight size={16} />
+                </a>
+              </div>
             </div>
           </div>
         </div>
