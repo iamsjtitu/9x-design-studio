@@ -7,8 +7,7 @@ const projects = [
     category: 'SaaS Platform',
     description:
       'End-to-end Rice Mill management platform for 100+ rice mills across India — real-time heartbeats, WhatsApp alerts, online access, live weighbridge integration & many more.',
-    image:
-      'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&auto=format&fit=crop&q=80',
+    image: '/projects/mill-9x-design.jpg',
     tags: ['Node.js', 'Cloudflare Tunnels', 'WhatsApp API'],
     color: 'hsl(16 100% 50%)',
     client: 'MillEntry · Internal Product',
